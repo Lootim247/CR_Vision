@@ -17,6 +17,8 @@ class SpawnDataGen:
         - '1' to label frame as 1
         - '/' to skip
         - 'b' to undo last label
+        Skip should be used for cropping edges only, skipping a central frame
+        can lead to undefined behaviour.
         """
         labeled_frames = []
         curr_frame = frame_start
@@ -42,7 +44,7 @@ class SpawnDataGen:
             # Save as numeric array to avoid pickling issues
             np.savetxt(fname, np.array(labeled_frames, dtype=int), fmt="%d")
 
-    def get_label_for_frame(self, frame_index):
+    def get_label_for_frame(self, frame_index, inFill=False):
         """
         Display the frame and get a label from the user.
         Returns:
@@ -63,12 +65,12 @@ class SpawnDataGen:
             return 0
         elif key == ord("1"):
             return 1
-        elif key == ord("/"):
+        elif key == ord("/") and not inFill:
             return None
-        elif key == ord("b"):
+        elif key == ord("b") and not inFill:
             return "back"
         else:
-            return None
+            return self.get_label_for_frame(frame_index, inFill)
 
     def smartfill(self, fname, frame_diff, frame_start=0, fill_1_to_1=False, fill_0_to_0=True):
         """
@@ -102,7 +104,7 @@ class SpawnDataGen:
             # Auto-fill if both sides match and corresponding fill flag is True
             if start_val == end_val and start_val != -1:
                 if (start_val == 0 and fill_0_to_0) or (start_val == 1 and fill_1_to_1) or (end - start - 2 <= 2):            
-                    arr[start+1:end-1] = start_val  # fill interior
+                    arr[start+1:end] = start_val  # fill interior
                     print(f'Filling from {start + 1}:{end} with {start_val}s')
                     return
 
@@ -110,7 +112,7 @@ class SpawnDataGen:
             mid = (start + end) // 2
             if arr[mid] == -1:
                 print(f'Checking mid index:{mid}')
-                label = self.get_label_for_frame(min_frame + mid)
+                label = self.get_label_for_frame(min_frame + mid, False)
                 print(f'arr[{mid}] = {label}')
                 if label is not None and label != "back":
                     arr[mid] = label
@@ -136,4 +138,4 @@ class SpawnDataGen:
 
         # Save filled frames
         filled_frames = np.array([(i + min_frame, val) for i, val in enumerate(arr)], dtype=int)
-        np.savetxt(fname.replace(".txt", "_smart_filled.txt"), filled_frames, fmt="%d")
+        np.savetxt(fname.replace(".txt", "_smart_filled.txt"), filled_frames)

@@ -20,10 +20,6 @@ class Video:
         cv2.destroyAllWindows()
 
     def at(self, frame_index):
-        # Ensure capture exists
-        if not hasattr(self, 'cap') or not self.cap.isOpened():
-            raise ValueError("VideoCapture is not open. Call vid_to_frames() or initialize first.")
-        
         # Set the frame position
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
         ret, current_frame = self.cap.read()
