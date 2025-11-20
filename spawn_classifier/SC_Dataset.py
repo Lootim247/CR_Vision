@@ -3,43 +3,21 @@
 # Spawn Classifier Dataset (SCD)
 # Class created to interact with the tensor dataloader
 
-from processing_tools.Video import Video
 from torch.utils.data import Dataset
 from torchvision import transforms
 
 import torch
-from collections import OrderedDict
 import numpy as np
 import sys
-
-class LRUCache():
-    def __init__(self, capacity=12):
-        self.capacity = capacity
-        self.data = OrderedDict()
-
-    # key by video
-    def get(self, key):
-        try:
-            val = self.data.pop(key)
-            self.data[key] = val
-            return val
-        except KeyError:
-            return None
-    
-    def put(self, key, value):
-        if key in self.data:
-            self.data.pop(key)
-        elif len(self.data) >= self.capacity:
-            self.data.popitem(last=False)
-        self.data[key] = value
+import json
 
 # Inherets Dataset and overwrites len and getitem
 class SC_Dataset(Dataset):
-    def __init__(self, data_dir, rel_path='data/raw_video/', transform=None):
-        self.data_dir = data_dir
-        self.data = np.loadtxt(data_dir).astype(np.int64)
+    def __init__(self, title="main", data_path='data/', transform=None):
+        self.title = title
+        self.data_path = data_path
+        self.data = np.loadtxt(f'{data_path}{title}.txt')
         self.video_cache = None
-        self.rel_path = rel_path
 
         if transform is None:
             self.transform = transforms.ToTensor()
@@ -50,25 +28,29 @@ class SC_Dataset(Dataset):
     def __len__(self):
         return self.data.shape[0]
 
-    def _init_worker_cache(self):
-        self.video_cache = LRUCache()
-
     # must return the image and class in (image_tensor, label_tensor) tuple
     def __getitem__(self, index):
-        if self.video_cache is None:
-            self._init_worker_cache()
-        
-        video, frame, label = self.data[index]
+        video, frame, label = self.data[index].astype(np.int32)
 
-        cached = self.video_cache.get(video)
-        if cached is not None:
-            video = cached
-        else:
-            video = Video(f'{self.rel_path}{video}.mp4')
-            self.video_cache.put(video, video)
+        json_path = f'{self.data_path}frame_arrays/{video}_meta.json'
+        with open(json_path, "r", encoding="utf-8") as f:
+            self.json = json.load(f)
         
-        frame_data = video.at(frame)
+        frames = np.memmap(
+            f'{self.data_path}frame_arrays/{video}.dat', 
+            dtype=np.uint8, 
+            mode="r", 
+            shape=(self.json["num_frames"], 
+            self.json["height"], 
+            self.json["width"], 
+            3))
+
+        frame_data = frames[frame]
+
+        # print(f'Frame_data shape: {frame_data.shape}')
+        # print(f'type of frame_data: {type(frame_data)}')
+
         if frame_data is None:
             raise ValueError(f'Video:{video}[{frame}] is None')
 
-        return (self.transform(frame_data), torch.tensor(label, dtype=torch.long))
+        return (self.transform(frame_data.copy()), torch.tensor(label, dtype=torch.long))

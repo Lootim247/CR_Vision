@@ -4,7 +4,7 @@
 # functions. smart fill enables an easier filling experience.
 import numpy as np
 import cv2
-from processing_tools.Video import Video
+from processing_tools.video.Video.Video import Video
 
 class SpawnDataGen:
     def __init__(self, video):
